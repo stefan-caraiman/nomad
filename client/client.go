@@ -2421,7 +2421,9 @@ func (c *Client) emitClientMetrics() {
 	}
 }
 
+// TODO
 func (c *Client) getAllocatedResources(selfNode *structs.Node) *structs.Resources {
+	return &structs.Resources{}
 	// Unfortunately the allocs only have IP so we need to match them to the
 	// device
 	cidrToDevice := make(map[*net.IPNet]string, len(selfNode.Resources.Networks))
