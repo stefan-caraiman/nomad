@@ -234,6 +234,7 @@ type DockerDriverConfig struct {
 	ForcePull            bool                `mapstructure:"force_pull"`             // Always force pull before running image, useful if your tags are mutable
 	MacAddress           string              `mapstructure:"mac_address"`            // Pin mac address to container
 	SecurityOpt          []string            `mapstructure:"security_opt"`           // Flags to pass directly to security-opt
+	MemLimitDisable      bool                `mapstructure:"mem_limit_disable"`  // Use soft memory limit instead of hard
 	Devices              []DockerDevice      `mapstructure:"devices"`                // To allow mounting USB or other serial control devices
 	CapAdd               []string            `mapstructure:"cap_add"`                // Flags to pass directly to cap-add
 	CapDrop              []string            `mapstructure:"cap_drop"`               // Flags to pass directly to cap-drop
@@ -729,6 +730,9 @@ func (d *DockerDriver) Validate(config map[string]interface{}) error {
 			"security_opt": {
 				Type: fields.TypeArray,
 			},
+			"mem_limit_disable": {
+				Type: fields.TypeBool,
+			},
 			"devices": {
 				Type: fields.TypeArray,
 			},
@@ -1209,7 +1213,13 @@ func (d *DockerDriver) createContainerConfig(ctx *ExecContext, task *structs.Tas
 		config.WorkingDir = driverConfig.WorkDir
 	}
 
-	memLimit := int64(task.Resources.MemoryMB) * 1024 * 1024
+	var memLimit, memReservation int64
+	taskMemReserved := int64(task.Resources.MemoryMB) * 1024 * 1024
+	if driverConfig.MemLimitDisable {
+		memReservation = taskMemReserved
+	} else {
+		memLimit = taskMemReserved
+	}
 
 	if len(driverConfig.Logging) == 0 {
 		if runtime.GOOS == "darwin" {
@@ -1225,6 +1235,7 @@ func (d *DockerDriver) createContainerConfig(ctx *ExecContext, task *structs.Tas
 	hostConfig := &docker.HostConfig{
 		// Convert MB to bytes. This is an absolute value.
 		Memory: memLimit,
+		MemoryReservation: memReservation,
 		// Convert Mhz to shares. This is a relative value.
 		CPUShares: int64(task.Resources.CPU),
 
